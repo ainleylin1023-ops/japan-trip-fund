@@ -25,6 +25,9 @@
   }
   .total-label { font-size: 13px; color: #888780; margin-bottom: 6px; }
   .total-amt { font-size: 34px; font-weight: 600; color: #0F6E56; }
+  .total-grid { display: flex; gap: 20px; }
+  .total-grid > div { flex: 1; }
+  .total-amt.month { font-size: 26px; color: #2C2C2A; }
   .section-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
   .week-grid { display: flex; gap: 12px; }
   .week-cell {
@@ -62,6 +65,67 @@
   button.primary { background: #0F6E56; border-color: #0F6E56; color: #fff; }
   .amt-btn.selected { background: #0F6E56; border-color: #0F6E56; color: #fff; }
   .hint { font-size: 12px; color: #888780; margin-top: 10px; }
+  .status-row { display: flex; gap: 8px; margin-bottom: 20px; }
+  .status-pill {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #EDEBE3;
+    color: #888780;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .status-pill::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #B4B2A9;
+    display: inline-block;
+  }
+  .status-pill.on { background: #E4F2EC; color: #0F6E56; }
+  .status-pill.on::before { background: #0F6E56; }
+  .status-pill.off { background: #FBEAE4; color: #B4472A; }
+  .status-pill.off::before { background: #B4472A; }
+  .section-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .section-title-row .section-title { margin: 0; }
+  .week-range { font-size: 12px; color: #888780; }
+  .cal-nav { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #888780; }
+  .cal-nav button {
+    width: 28px; height: 28px; padding: 0; font-size: 15px; line-height: 1;
+    border-radius: 6px; color: #2C2C2A;
+  }
+  .cal-legend { display: flex; gap: 16px; font-size: 12px; color: #888780; margin-bottom: 10px; }
+  .cal-legend .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .dot.ainley { background: #0F6E56; }
+  .dot.boyfriend { background: #C98A2C; }
+  .cal-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    font-size: 11px; color: #B4B2A9; text-align: center; margin-bottom: 6px;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  .cal-day {
+    aspect-ratio: 1; border-radius: 8px; background: #F6F4EF;
+    display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+    padding-top: 6px;
+    font-size: 12px; color: #2C2C2A; position: relative; gap: 2px;
+  }
+  .cal-day.empty { background: transparent; }
+  .cal-day .num { font-size: 12px; }
+  .cal-day.today { background: #0F6E56; }
+  .cal-day.today .num {
+    color: #fff; font-weight: 700; width: 18px; height: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cal-day.today .amt-line { color: #E4F2EC; }
+  .cal-day .amt-line { font-size: 9px; line-height: 1.3; }
+  .cal-day .amt-line.ainley { color: #0F6E56; }
+  .cal-day .amt-line.boyfriend { color: #C98A2C; }
+  .cal-day .amt-line.total { color: #2C2C2A; font-weight: 600; border-top: 1px solid #E4E2D8; margin-top: 1px; padding-top: 1px; }
+  .cal-day.today .amt-line.ainley,
+  .cal-day.today .amt-line.boyfriend { color: #E4F2EC; }
+  .cal-day.today .amt-line.total { color: #fff; border-top-color: rgba(255,255,255,0.35); }
   .log-row {
     display: flex;
     justify-content: space-between;
@@ -81,23 +145,65 @@
 <div class="wrap">
   <div class="eyebrow">共同旅遊基金</div>
   <div class="title">大阪旅行 · 生活費儲蓄</div>
-
-  <div class="card">
-    <div class="total-label">目前累積</div>
-    <div class="total-amt" id="currentAmt">$0</div>
+  <div class="status-row">
+    <span id="connStatus" class="status-pill">連線中…</span>
+    <span id="peerStatus" class="status-pill">對方狀態未知</span>
   </div>
-
+  <div class="row" style="margin-bottom:16px;">
+    <span style="font-size:13px;color:#888780;">我是</span>
+    <select id="myIdentity">
+      <option value="Ainley">Ainley</option>
+      <option value="Daniel">Daniel</option>
+    </select>
+  </div>
+ 
   <div class="card">
-    <div class="section-title">本週進度</div>
+    <div class="total-grid">
+      <div>
+        <div class="total-label">本月累積</div>
+        <div class="total-amt month" id="monthAmt">$0</div>
+      </div>
+      <div>
+        <div class="total-label">總累積</div>
+        <div class="total-amt" id="currentAmt">$0</div>
+      </div>
+    </div>
+  </div>
+ 
+  <div class="card">
+    <div class="section-title-row">
+      <div class="section-title">本週進度</div>
+      <div class="week-range" id="weekRange"></div>
+    </div>
     <div class="week-grid" id="weekBreakdown"></div>
   </div>
-
+ 
+  <div class="card">
+    <div class="section-title-row">
+      <div class="section-title">月曆</div>
+      <div class="cal-nav">
+        <button type="button" id="calPrev">‹</button>
+        <span id="calLabel"></span>
+        <button type="button" id="calNext">›</button>
+      </div>
+    </div>
+    <div class="cal-legend">
+      <span><i class="dot ainley"></i>Ainley</span>
+      <span><i class="dot boyfriend"></i>Daniel</span>
+      <span id="calMonthTotal" style="margin-left:auto;font-weight:600;color:#2C2C2A;"></span>
+    </div>
+    <div class="cal-weekdays">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+  </div>
+ 
   <div class="card">
     <div class="section-title">新增存款</div>
     <div class="row">
       <select id="who">
         <option value="Ainley">Ainley</option>
-        <option value="男友">男友</option>
+        <option value="Daniel">Daniel</option>
       </select>
       <input type="date" id="entryDate">
     </div>
@@ -112,28 +218,28 @@
     </div>
     <div class="hint">選成員、選日期、按金額，一次可以直接記一整週的 $200，不用分四筆 $50。</div>
   </div>
-
+ 
   <div class="card">
     <div class="section-title">存款紀錄</div>
     <div class="row" style="margin-bottom:12px;">
       <select id="filterWho">
         <option value="all">全部成員</option>
         <option value="Ainley">Ainley</option>
-        <option value="男友">男友</option>
+        <option value="Daniel">Daniel</option>
       </select>
     </div>
     <div id="log"></div>
   </div>
 </div>
-
+ 
 <script>
 (function(){
   var STORAGE_KEY = 'japan-trip-fund-v1';
   var PER_PERSON_TARGET = 200;
   var state = { entries: [] };
-
+ 
   function fmt(n){ return "$" + Math.round(n).toLocaleString(); }
-
+ 
   function getWeekKey(d){
     var date = new Date(d);
     var day = date.getDay();
@@ -141,20 +247,62 @@
     var monday = new Date(date.setDate(diff));
     return monday.toISOString().slice(0,10);
   }
-
+ 
   var FIREBASE_URL = 'https://japan-trip-fund-default-rtdb.asia-southeast1.firebasedatabase.app';
-
+  var IDENTITY_KEY = 'japan-trip-fund-identity';
+  var PRESENCE_STALE_MS = 45 * 1000; // consider someone offline if no heartbeat in 45s
+ 
+  function setConnStatus(ok){
+    var el = document.getElementById('connStatus');
+    el.classList.remove('on', 'off');
+    if(ok === true){ el.classList.add('on'); el.textContent = '已連線'; }
+    else if(ok === false){ el.classList.add('off'); el.textContent = '連線中斷'; }
+    else { el.textContent = '連線中…'; }
+  }
+ 
+  function setPeerStatus(peerName, online){
+    var el = document.getElementById('peerStatus');
+    el.classList.remove('on', 'off');
+    if(online === null){ el.textContent = '對方狀態未知'; return; }
+    if(online){ el.classList.add('on'); el.textContent = peerName + ' 在線上'; }
+    else { el.classList.add('off'); el.textContent = peerName + ' 目前離線'; }
+  }
+ 
+  function otherPerson(name){ return name === 'Ainley' ? 'Daniel' : 'Ainley'; }
+ 
+  function sendHeartbeat(){
+    var me = document.getElementById('myIdentity').value;
+    fetch(FIREBASE_URL + '/presence/' + encodeURIComponent(me) + '.json', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Date.now())
+    }).then(function(){ setConnStatus(true); })
+      .catch(function(){ setConnStatus(false); });
+  }
+ 
+  function checkPeer(){
+    var me = document.getElementById('myIdentity').value;
+    var peer = otherPerson(me);
+    fetch(FIREBASE_URL + '/presence/' + encodeURIComponent(peer) + '.json')
+      .then(function(res){ return res.json(); })
+      .then(function(ts){
+        if(!ts){ setPeerStatus(peer, false); return; }
+        setPeerStatus(peer, (Date.now() - ts) < PRESENCE_STALE_MS);
+      })
+      .catch(function(){ /* leave last known status */ });
+  }
+ 
   function saveLocal(){
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
   }
-
+ 
   function loadLocal(){
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if(raw){ state = JSON.parse(raw); }
     } catch(e){}
   }
-
+ 
   // Adds a single entry via POST, which gets its own unique key from Firebase.
   // This never touches other entries, so two people saving at the same time can't overwrite each other.
   function addEntry(entry){
@@ -176,7 +324,7 @@
         saveLocal();
       });
   }
-
+ 
   // Deletes a single entry by its Firebase key, leaving every other entry untouched.
   function deleteEntry(id){
     state.entries = state.entries.filter(function(e){ return e.id !== id; });
@@ -184,7 +332,7 @@
     if(id.indexOf('local-') === 0) return Promise.resolve();
     return fetch(FIREBASE_URL + '/entries/' + id + '.json', { method: 'DELETE' }).catch(function(){});
   }
-
+ 
   function load(){
     loadLocal();
     return fetch(FIREBASE_URL + '/entries.json')
@@ -201,13 +349,25 @@
       })
       .catch(function(){ /* fall back to whatever loaded from localStorage */ });
   }
-
+ 
   function render(){
     var total = state.entries.reduce(function(s,e){ return s+e.amount; }, 0);
     document.getElementById('currentAmt').textContent = fmt(total);
-
+ 
+    var now = new Date();
+    var monthTotal = state.entries.reduce(function(s,e){
+      if(!e.iso) return s;
+      var d = new Date(e.iso);
+      return (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) ? s + e.amount : s;
+    }, 0);
+    document.getElementById('monthAmt').textContent = fmt(monthTotal);
+ 
     var thisWeekKey = getWeekKey(new Date());
-    var byPerson = { 'Ainley': 0, '男友': 0 };
+    var weekStart = new Date(thisWeekKey + 'T12:00:00');
+    var weekEnd = new Date(weekStart); weekEnd.setDate(weekStart.getDate() + 6);
+    document.getElementById('weekRange').textContent =
+      (weekStart.getMonth()+1) + '/' + weekStart.getDate() + ' – ' + (weekEnd.getMonth()+1) + '/' + weekEnd.getDate();
+    var byPerson = { 'Ainley': 0, 'Daniel': 0 };
     state.entries.forEach(function(e){
       var entryDate = e.iso ? new Date(e.iso) : new Date();
       if(getWeekKey(entryDate) === thisWeekKey && byPerson.hasOwnProperty(e.who)){
@@ -223,14 +383,14 @@
         + '<div class="week-amt' + (ok ? ' ok' : '') + '">' + fmt(amt) + ' / ' + fmt(PER_PERSON_TARGET) + '</div>'
         + '</div>';
     }).join('');
-
+ 
     var logEl = document.getElementById('log');
     var filterVal = document.getElementById('filterWho').value;
     var visible = state.entries
       .map(function(e, i){ return { e: e, realIdx: i }; })
       .filter(function(item){ return filterVal === 'all' || item.e.who === filterVal; })
       .sort(function(a, b){ return new Date(b.e.iso) - new Date(a.e.iso); });
-
+ 
     if(visible.length === 0){
       logEl.innerHTML = '<div class="empty">' + (state.entries.length === 0 ? '還沒有存款紀錄，開始記錄第一筆吧。' : '這個成員目前沒有紀錄。') + '</div>';
     } else {
@@ -265,10 +425,69 @@
         });
       });
     }
+    renderCalendar();
   }
-
+ 
+  var calCursor = new Date();
+  calCursor.setDate(1);
+ 
+  function renderCalendar(){
+    var year = calCursor.getFullYear();
+    var month = calCursor.getMonth();
+    document.getElementById('calLabel').textContent = year + ' 年 ' + (month + 1) + ' 月';
+ 
+    var byDay = {};
+    var monthTotal = 0;
+    state.entries.forEach(function(e){
+      if(!e.iso) return;
+      var d = new Date(e.iso);
+      if(d.getFullYear() !== year || d.getMonth() !== month) return;
+      var key = d.getDate();
+      if(!byDay[key]) byDay[key] = { 'Ainley': 0, 'Daniel': 0 };
+      byDay[key][e.who] = (byDay[key][e.who] || 0) + e.amount;
+      monthTotal += e.amount;
+    });
+    document.getElementById('calMonthTotal').textContent = '本月共 ' + fmt(monthTotal);
+ 
+    var firstDay = new Date(year, month, 1);
+    var startOffset = (firstDay.getDay() + 6) % 7; // Monday = 0
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var todayStr = new Date().toDateString();
+ 
+    var cells = '';
+    for(var i = 0; i < startOffset; i++){
+      cells += '<div class="cal-day empty"></div>';
+    }
+    for(var day = 1; day <= daysInMonth; day++){
+      var cellDate = new Date(year, month, day);
+      var isToday = cellDate.toDateString() === todayStr;
+      var marks = byDay[day];
+      var lines = '';
+      if(marks){
+        if(marks['Ainley']) lines += '<span class="amt-line ainley">' + fmt(marks['Ainley']) + '</span>';
+        if(marks['Daniel']) lines += '<span class="amt-line boyfriend">' + fmt(marks['Daniel']) + '</span>';
+        var dayTotal = (marks['Ainley'] || 0) + (marks['Daniel'] || 0);
+        if(dayTotal) lines += '<span class="amt-line total">' + fmt(dayTotal) + '</span>';
+      }
+      cells += '<div class="cal-day' + (isToday ? ' today' : '') + '">'
+        + '<span class="num">' + day + '</span>'
+        + lines
+        + '</div>';
+    }
+    document.getElementById('calGrid').innerHTML = cells;
+  }
+ 
+  document.getElementById('calPrev').addEventListener('click', function(){
+    calCursor.setMonth(calCursor.getMonth() - 1);
+    renderCalendar();
+  });
+  document.getElementById('calNext').addEventListener('click', function(){
+    calCursor.setMonth(calCursor.getMonth() + 1);
+    renderCalendar();
+  });
+ 
   var selectedAmount = null;
-
+ 
   document.querySelectorAll('.amt-btn').forEach(function(btn){
     btn.addEventListener('click', function(){
       document.querySelectorAll('.amt-btn').forEach(function(b){ b.classList.remove('selected'); });
@@ -276,7 +495,7 @@
       selectedAmount = parseFloat(btn.getAttribute('data-amt'));
     });
   });
-
+ 
   document.getElementById('add').addEventListener('click', function(){
     var who = document.getElementById('who').value;
     if(!selectedAmount){
@@ -295,13 +514,28 @@
     addEntry(entry).then(render);
     render();
   });
-
+ 
   document.getElementById('filterWho').addEventListener('change', render);
-
+ 
   document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+ 
+  var savedIdentity = null;
+  try { savedIdentity = localStorage.getItem(IDENTITY_KEY); } catch(e){}
+  if(savedIdentity){ document.getElementById('myIdentity').value = savedIdentity; }
+  document.getElementById('myIdentity').addEventListener('change', function(){
+    try { localStorage.setItem(IDENTITY_KEY, this.value); } catch(e){}
+    sendHeartbeat();
+    checkPeer();
+  });
+ 
   loadLocal();
   render();
   load().then(render);
+ 
+  sendHeartbeat();
+  checkPeer();
+  setInterval(sendHeartbeat, 20000);
+  setInterval(checkPeer, 20000);
 })();
 </script>
 </body>
