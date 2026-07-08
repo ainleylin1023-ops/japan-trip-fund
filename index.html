@@ -126,6 +126,13 @@
   .cal-day.today .amt-line.ainley,
   .cal-day.today .amt-line.boyfriend { color: #E4F2EC; }
   .cal-day.today .amt-line.total { color: #fff; border-top-color: rgba(255,255,255,0.35); }
+  .shortfall-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 0; border-bottom: 1px solid #EDEBE3; font-size: 14px;
+  }
+  .shortfall-row:last-child { border-bottom: none; }
+  .shortfall-week { color: #888780; font-size: 12px; }
+  .shortfall-amt { color: #B4472A; font-weight: 600; }
   .log-row {
     display: flex;
     justify-content: space-between;
@@ -168,6 +175,11 @@
         <div class="total-amt" id="currentAmt">$0</div>
       </div>
     </div>
+  </div>
+ 
+  <div class="card" id="shortfallCard" style="display:none;">
+    <div class="section-title">待補金額</div>
+    <div id="shortfallList"></div>
   </div>
  
   <div class="card">
@@ -426,6 +438,57 @@
       });
     }
     renderCalendar();
+    renderShortfalls();
+  }
+ 
+  function renderShortfalls(){
+    var card = document.getElementById('shortfallCard');
+    var list = document.getElementById('shortfallList');
+ 
+    if(state.entries.length === 0){ card.style.display = 'none'; return; }
+ 
+    var earliestIso = state.entries.reduce(function(min, e){
+      return (e.iso && e.iso < min) ? e.iso : min;
+    }, state.entries[0].iso || new Date().toISOString());
+    var cursorKey = getWeekKey(new Date(earliestIso));
+    var thisWeekKey = getWeekKey(new Date());
+ 
+    var byWeekPerson = {};
+    state.entries.forEach(function(e){
+      if(!e.iso) return;
+      var wk = getWeekKey(new Date(e.iso));
+      if(!byWeekPerson[wk]) byWeekPerson[wk] = { 'Ainley': 0, 'Daniel': 0 };
+      byWeekPerson[wk][e.who] = (byWeekPerson[wk][e.who] || 0) + e.amount;
+    });
+ 
+    var rows = [];
+    var cursor = new Date(cursorKey + 'T12:00:00');
+    var thisWeekStart = new Date(thisWeekKey + 'T12:00:00');
+    while(cursor < thisWeekStart){
+      var key = cursor.toISOString().slice(0,10);
+      var totals = byWeekPerson[key] || { 'Ainley': 0, 'Daniel': 0 };
+      ['Ainley', 'Daniel'].forEach(function(name){
+        var short = PER_PERSON_TARGET - (totals[name] || 0);
+        if(short > 0){
+          var wEnd = new Date(cursor); wEnd.setDate(cursor.getDate() + 6);
+          rows.push({
+            label: (cursor.getMonth()+1) + '/' + cursor.getDate() + '–' + (wEnd.getMonth()+1) + '/' + wEnd.getDate(),
+            name: name,
+            amount: short
+          });
+        }
+      });
+      cursor.setDate(cursor.getDate() + 7);
+    }
+ 
+    if(rows.length === 0){ card.style.display = 'none'; return; }
+    card.style.display = '';
+    list.innerHTML = rows.map(function(r){
+      return '<div class="shortfall-row">'
+        + '<span>' + r.name + ' <span class="shortfall-week">' + r.label + '</span></span>'
+        + '<span class="shortfall-amt">還差 ' + fmt(r.amount) + '</span>'
+        + '</div>';
+    }).join('');
   }
  
   var calCursor = new Date();
