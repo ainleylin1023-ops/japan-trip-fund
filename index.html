@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>共同旅遊基金</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", sans-serif;
+    background: #F6F4EF;
+    color: #2C2C2A;
+    margin: 0;
+    padding: 24px 16px 80px;
+  }
+  .wrap { max-width: 480px; margin: 0 auto; }
+  .eyebrow { font-size: 13px; color: #888780; margin-bottom: 2px; }
+  .title { font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+  .card {
+    background: #FFFFFF;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .total-label { font-size: 13px; color: #888780; margin-bottom: 6px; }
+  .total-amt { font-size: 34px; font-weight: 600; color: #0F6E56; }
+  .section-title { font-size: 14px; font-weight: 600; margin: 0 0 12px; }
+  .week-grid { display: flex; gap: 12px; }
+  .week-cell {
+    flex: 1;
+    background: #F6F4EF;
+    border-radius: 10px;
+    padding: 12px;
+  }
+  .week-name { font-size: 12px; color: #888780; }
+  .week-amt { font-size: 16px; font-weight: 600; margin-top: 2px; }
+  .ok { color: #0F6E56; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  select, input[type=number], input[type=date] {
+    height: 40px;
+    border: 1px solid #D3D1C7;
+    border-radius: 8px;
+    padding: 0 10px;
+    font-size: 15px;
+    background: #fff;
+    color: #2C2C2A;
+  }
+  select { width: 110px; }
+  input[type=number] { width: 90px; }
+  button {
+    height: 40px;
+    border-radius: 8px;
+    border: 1px solid #D3D1C7;
+    background: #fff;
+    padding: 0 14px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  button:active { transform: scale(0.98); }
+  button.primary { background: #0F6E56; border-color: #0F6E56; color: #fff; }
+  .amt-btn.selected { background: #0F6E56; border-color: #0F6E56; color: #fff; }
+  .hint { font-size: 12px; color: #888780; margin-top: 10px; }
+  .log-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #EDEBE3;
+    font-size: 14px;
+  }
+  .log-row:last-child { border-bottom: none; }
+  .log-amt { font-weight: 600; margin-right: 10px; }
+  .del { color: #B4B2A9; cursor: pointer; font-size: 16px; padding: 0 4px; }
+  .empty { font-size: 13px; color: #888780; padding: 8px 0; }
+  #log { max-height: 260px; overflow-y: auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">共同旅遊基金</div>
+  <div class="title">大阪旅行 · 生活費儲蓄</div>
+
+  <div class="card">
+    <div class="total-label">目前累積</div>
+    <div class="total-amt" id="currentAmt">$0</div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">本週進度</div>
+    <div class="week-grid" id="weekBreakdown"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">新增存款</div>
+    <div class="row">
+      <select id="who">
+        <option value="Ainley">Ainley</option>
+        <option value="男友">男友</option>
+      </select>
+      <input type="date" id="entryDate">
+    </div>
+    <div class="row" id="amountPicker" style="margin-top:10px;">
+      <button type="button" class="amt-btn" data-amt="50">$50</button>
+      <button type="button" class="amt-btn" data-amt="100">$100</button>
+      <button type="button" class="amt-btn" data-amt="200">$200</button>
+    </div>
+    <div class="row" style="margin-top:12px;">
+      <button class="primary" id="add">新增紀錄</button>
+    </div>
+    <div class="hint">選成員、選日期、按金額，一次可以直接記一整週的 $200，不用分四筆 $50。</div>
+  </div>
+
+  <div class="card">
+    <div class="section-title">存款紀錄</div>
+    <div class="row" style="margin-bottom:12px;">
+      <select id="filterWho">
+        <option value="all">全部成員</option>
+        <option value="Ainley">Ainley</option>
+        <option value="男友">男友</option>
+      </select>
+    </div>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var STORAGE_KEY = 'japan-trip-fund-v1';
+  var PER_PERSON_TARGET = 200;
+  var state = { entries: [] };
+
+  function fmt(n){ return "$" + Math.round(n).toLocaleString(); }
+
+  function getWeekKey(d){
+    var date = new Date(d);
+    var day = date.getDay();
+    var diff = date.getDate() - day + (day===0?-6:1);
+    var monday = new Date(date.setDate(diff));
+    return monday.toISOString().slice(0,10);
+  }
+
+  function save(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
+  }
+
+  function load(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if(raw){ state = JSON.parse(raw); }
+    } catch(e){}
+  }
+
+  function render(){
+    var total = state.entries.reduce(function(s,e){ return s+e.amount; }, 0);
+    document.getElementById('currentAmt').textContent = fmt(total);
+
+    var thisWeekKey = getWeekKey(new Date());
+    var byPerson = { 'Ainley': 0, '男友': 0 };
+    state.entries.forEach(function(e){
+      var entryDate = e.iso ? new Date(e.iso) : new Date();
+      if(getWeekKey(entryDate) === thisWeekKey && byPerson.hasOwnProperty(e.who)){
+        byPerson[e.who] += e.amount;
+      }
+    });
+    var wb = document.getElementById('weekBreakdown');
+    wb.innerHTML = Object.keys(byPerson).map(function(name){
+      var amt = byPerson[name];
+      var ok = amt >= PER_PERSON_TARGET;
+      return '<div class="week-cell">'
+        + '<div class="week-name">' + name + '</div>'
+        + '<div class="week-amt' + (ok ? ' ok' : '') + '">' + fmt(amt) + ' / ' + fmt(PER_PERSON_TARGET) + '</div>'
+        + '</div>';
+    }).join('');
+
+    var logEl = document.getElementById('log');
+    var filterVal = document.getElementById('filterWho').value;
+    var visible = state.entries
+      .map(function(e, i){ return { e: e, realIdx: i }; })
+      .filter(function(item){ return filterVal === 'all' || item.e.who === filterVal; })
+      .sort(function(a, b){ return new Date(b.e.iso) - new Date(a.e.iso); });
+
+    if(visible.length === 0){
+      logEl.innerHTML = '<div class="empty">' + (state.entries.length === 0 ? '還沒有存款紀錄，開始記錄第一筆吧。' : '這個成員目前沒有紀錄。') + '</div>';
+    } else {
+      var rows = visible.map(function(item){
+        var e = item.e;
+        return '<div class="log-row">'
+          + '<span>' + e.date + ' · ' + e.who + '</span>'
+          + '<span><span class="log-amt">' + fmt(e.amount) + '</span>'
+          + '<span class="del" data-idx="' + item.realIdx + '" data-armed="0">✕</span></span>'
+          + '</div>';
+      }).join('');
+      logEl.innerHTML = rows;
+      logEl.querySelectorAll('[data-idx]').forEach(function(el){
+        el.addEventListener('click', function(){
+          var armed = el.getAttribute('data-armed') === '1';
+          if(!armed){
+            logEl.querySelectorAll('.del').forEach(function(d){
+              d.setAttribute('data-armed', '0');
+              d.textContent = '✕';
+              d.style.color = '';
+              d.style.fontWeight = '';
+            });
+            el.setAttribute('data-armed', '1');
+            el.textContent = '確定刪除？';
+            el.style.color = '#D85A30';
+            el.style.fontWeight = '600';
+            return;
+          }
+          var i = parseInt(el.getAttribute('data-idx'));
+          state.entries.splice(i, 1);
+          save();
+          render();
+        });
+      });
+    }
+  }
+
+  var selectedAmount = null;
+
+  document.querySelectorAll('.amt-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.amt-btn').forEach(function(b){ b.classList.remove('selected'); });
+      btn.classList.add('selected');
+      selectedAmount = parseFloat(btn.getAttribute('data-amt'));
+    });
+  });
+
+  document.getElementById('add').addEventListener('click', function(){
+    var who = document.getElementById('who').value;
+    if(!selectedAmount){
+      var picker = document.getElementById('amountPicker');
+      picker.style.outline = '2px solid #D85A30';
+      picker.style.borderRadius = '10px';
+      setTimeout(function(){ picker.style.outline = 'none'; }, 900);
+      return;
+    }
+    var dateInput = document.getElementById('entryDate').value;
+    var d = dateInput ? new Date(dateInput + 'T12:00:00') : new Date();
+    var dateStr = (d.getMonth()+1) + '/' + d.getDate();
+    state.entries.push({ who: who, amount: selectedAmount, date: dateStr, iso: d.toISOString() });
+    save();
+    document.querySelectorAll('.amt-btn').forEach(function(b){ b.classList.remove('selected'); });
+    selectedAmount = null;
+    render();
+  });
+
+  document.getElementById('filterWho').addEventListener('change', render);
+
+  load();
+  document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+  render();
+})();
+</script>
+</body>
+</html>
