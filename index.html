@@ -147,6 +147,8 @@
   .empty { font-size: 13px; color: #888780; padding: 8px 0; }
   #log { max-height: 260px; overflow-y: auto; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 <div class="wrap">
@@ -232,7 +234,10 @@
   </div>
  
   <div class="card">
-    <div class="section-title">存款紀錄</div>
+    <div class="section-title-row">
+      <div class="section-title">存款紀錄</div>
+      <button type="button" id="exportBtn">匯出 Excel</button>
+    </div>
     <div class="row" style="margin-bottom:12px;">
       <select id="filterWho">
         <option value="all">全部成員</option>
@@ -577,6 +582,106 @@
   });
  
   document.getElementById('filterWho').addEventListener('change', render);
+ 
+  document.getElementById('exportBtn').addEventListener('click', function(){
+    if(typeof XLSX === 'undefined'){
+      window.alert('Excel 匯出功能載入失敗，請檢查網路連線後再試一次。');
+      return;
+    }
+    var sortedEntries = state.entries
+      .slice()
+      .sort(function(a, b){ return new Date(a.iso || 0) - new Date(b.iso || 0); });
+ 
+    // Sheet 1: 存款紀錄 (detailed log with week range + running total)
+    var running = 0;
+    var logRows = sortedEntries.map(function(e){
+      var wk = e.iso ? getWeekKey(new Date(e.iso)) : '';
+      var wkLabel = '';
+      if(wk){
+        var wStart = new Date(wk + 'T12:00:00');
+        var wEnd = new Date(wStart); wEnd.setDate(wStart.getDate() + 6);
+        wkLabel = (wStart.getMonth()+1) + '/' + wStart.getDate() + '–' + (wEnd.getMonth()+1) + '/' + wEnd.getDate();
+      }
+      var monthLabel = e.iso ? (new Date(e.iso).getFullYear() + '年' + (new Date(e.iso).getMonth()+1) + '月') : '';
+      running += e.amount;
+      return { 日期: e.date, 月份: monthLabel, 週次: wkLabel, 成員: e.who, 金額: e.amount, 累積總額: running };
+    });
+    logRows.push({ 日期: '', 月份: '', 週次: '', 成員: '', 金額: '', 累積總額: '' });
+    logRows.push({ 日期: '總計', 月份: '', 週次: '', 成員: '', 金額: running, 累積總額: '' });
+    var wsLog = XLSX.utils.json_to_sheet(logRows);
+    wsLog['!cols'] = [{wch:10},{wch:12},{wch:14},{wch:8},{wch:10},{wch:12}];
+ 
+    // Sheet 2: 摘要 (per-person totals, this-month total, grand total)
+    var byPerson = { 'Ainley': 0, 'Daniel': 0 };
+    state.entries.forEach(function(e){
+      byPerson[e.who] = (byPerson[e.who] || 0) + e.amount;
+    });
+    var summaryRows = [
+      { 項目: 'Ainley 累積', 金額: byPerson['Ainley'] || 0 },
+      { 項目: 'Daniel 累積', 金額: byPerson['Daniel'] || 0 },
+      { 項目: '總累積', 金額: running },
+      { 項目: '匯出時間', 金額: new Date().toLocaleString('zh-TW') },
+      { 項目: '', 金額: '' }
+    ];
+    var byMonth = {};
+    state.entries.forEach(function(e){
+      if(!e.iso) return;
+      var d = new Date(e.iso);
+      var mKey = d.getFullYear() + '年' + (d.getMonth()+1) + '月';
+      byMonth[mKey] = (byMonth[mKey] || 0) + e.amount;
+    });
+    var monthKeys = Object.keys(byMonth).sort(function(a, b){
+      return new Date(a.replace('年','-').replace('月','-01')) - new Date(b.replace('年','-').replace('月','-01'));
+    });
+    monthKeys.forEach(function(mKey){
+      summaryRows.push({ 項目: mKey + ' 小計', 金額: byMonth[mKey] });
+    });
+    var wsSummary = XLSX.utils.json_to_sheet(summaryRows);
+    wsSummary['!cols'] = [{wch:16},{wch:20}];
+ 
+    // Sheet 3: 待補金額 (weeks where either person fell short of the $200 target)
+    var byWeekPerson = {};
+    state.entries.forEach(function(e){
+      if(!e.iso) return;
+      var wk = getWeekKey(new Date(e.iso));
+      if(!byWeekPerson[wk]) byWeekPerson[wk] = { 'Ainley': 0, 'Daniel': 0 };
+      byWeekPerson[wk][e.who] = (byWeekPerson[wk][e.who] || 0) + e.amount;
+    });
+    var shortRows = [];
+    if(state.entries.length > 0){
+      var earliestIso = state.entries.reduce(function(min, e){
+        return (e.iso && e.iso < min) ? e.iso : min;
+      }, state.entries[0].iso || new Date().toISOString());
+      var cursor = new Date(getWeekKey(new Date(earliestIso)) + 'T12:00:00');
+      var thisWeekStart = new Date(getWeekKey(new Date()) + 'T12:00:00');
+      while(cursor < thisWeekStart){
+        var key = cursor.toISOString().slice(0,10);
+        var totals = byWeekPerson[key] || { 'Ainley': 0, 'Daniel': 0 };
+        ['Ainley', 'Daniel'].forEach(function(name){
+          var short = PER_PERSON_TARGET - (totals[name] || 0);
+          if(short > 0){
+            var wEnd2 = new Date(cursor); wEnd2.setDate(cursor.getDate() + 6);
+            shortRows.push({
+              週次: (cursor.getMonth()+1) + '/' + cursor.getDate() + '–' + (wEnd2.getMonth()+1) + '/' + wEnd2.getDate(),
+              成員: name,
+              還差金額: short
+            });
+          }
+        });
+        cursor.setDate(cursor.getDate() + 7);
+      }
+    }
+    if(shortRows.length === 0){ shortRows.push({ 週次: '無', 成員: '', 還差金額: '目前每週都有存滿' }); }
+    var wsShort = XLSX.utils.json_to_sheet(shortRows);
+    wsShort['!cols'] = [{wch:14},{wch:8},{wch:14}];
+ 
+    var wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, wsSummary, '摘要');
+    XLSX.utils.book_append_sheet(wb, wsLog, '存款紀錄');
+    XLSX.utils.book_append_sheet(wb, wsShort, '待補金額');
+    var today = new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb, '日本旅行基金_' + today + '.xlsx');
+  });
  
   document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
  
