@@ -529,8 +529,6 @@
       if(marks){
         if(marks['Ainley']) lines += '<span class="amt-line ainley">' + fmt(marks['Ainley']) + '</span>';
         if(marks['Daniel']) lines += '<span class="amt-line boyfriend">' + fmt(marks['Daniel']) + '</span>';
-        var dayTotal = (marks['Ainley'] || 0) + (marks['Daniel'] || 0);
-        if(dayTotal) lines += '<span class="amt-line total">' + fmt(dayTotal) + '</span>';
       }
       cells += '<div class="cal-day' + (isToday ? ' today' : '') + '">'
         + '<span class="num">' + day + '</span>'
