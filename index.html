@@ -104,6 +104,7 @@
     <div class="row" id="amountPicker" style="margin-top:10px;">
       <button type="button" class="amt-btn" data-amt="50">$50</button>
       <button type="button" class="amt-btn" data-amt="100">$100</button>
+      <button type="button" class="amt-btn" data-amt="150">$150</button>
       <button type="button" class="amt-btn" data-amt="200">$200</button>
     </div>
     <div class="row" style="margin-top:12px;">
@@ -141,15 +142,64 @@
     return monday.toISOString().slice(0,10);
   }
 
-  function save(){
+  var FIREBASE_URL = 'https://japan-trip-fund-default-rtdb.asia-southeast1.firebasedatabase.app';
+
+  function saveLocal(){
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e){}
   }
 
-  function load(){
+  function loadLocal(){
     try {
       var raw = localStorage.getItem(STORAGE_KEY);
       if(raw){ state = JSON.parse(raw); }
     } catch(e){}
+  }
+
+  // Adds a single entry via POST, which gets its own unique key from Firebase.
+  // This never touches other entries, so two people saving at the same time can't overwrite each other.
+  function addEntry(entry){
+    return fetch(FIREBASE_URL + '/entries.json', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    })
+      .then(function(res){ return res.json(); })
+      .then(function(res){
+        entry.id = res.name;
+        state.entries.push(entry);
+        saveLocal();
+      })
+      .catch(function(){
+        // offline fallback: keep it locally with a temp id, will not sync until back online
+        entry.id = 'local-' + Date.now();
+        state.entries.push(entry);
+        saveLocal();
+      });
+  }
+
+  // Deletes a single entry by its Firebase key, leaving every other entry untouched.
+  function deleteEntry(id){
+    state.entries = state.entries.filter(function(e){ return e.id !== id; });
+    saveLocal();
+    if(id.indexOf('local-') === 0) return Promise.resolve();
+    return fetch(FIREBASE_URL + '/entries/' + id + '.json', { method: 'DELETE' }).catch(function(){});
+  }
+
+  function load(){
+    loadLocal();
+    return fetch(FIREBASE_URL + '/entries.json')
+      .then(function(res){ return res.json(); })
+      .then(function(data){
+        if(data && typeof data === 'object'){
+          state.entries = Object.keys(data).map(function(key){
+            var e = data[key];
+            e.id = key;
+            return e;
+          });
+          saveLocal();
+        }
+      })
+      .catch(function(){ /* fall back to whatever loaded from localStorage */ });
   }
 
   function render(){
@@ -189,11 +239,11 @@
         return '<div class="log-row">'
           + '<span>' + e.date + ' · ' + e.who + '</span>'
           + '<span><span class="log-amt">' + fmt(e.amount) + '</span>'
-          + '<span class="del" data-idx="' + item.realIdx + '" data-armed="0">✕</span></span>'
+          + '<span class="del" data-id="' + e.id + '" data-armed="0">✕</span></span>'
           + '</div>';
       }).join('');
       logEl.innerHTML = rows;
-      logEl.querySelectorAll('[data-idx]').forEach(function(el){
+      logEl.querySelectorAll('[data-id]').forEach(function(el){
         el.addEventListener('click', function(){
           var armed = el.getAttribute('data-armed') === '1';
           if(!armed){
@@ -209,9 +259,8 @@
             el.style.fontWeight = '600';
             return;
           }
-          var i = parseInt(el.getAttribute('data-idx'));
-          state.entries.splice(i, 1);
-          save();
+          var id = el.getAttribute('data-id');
+          deleteEntry(id).then(render);
           render();
         });
       });
@@ -240,18 +289,19 @@
     var dateInput = document.getElementById('entryDate').value;
     var d = dateInput ? new Date(dateInput + 'T12:00:00') : new Date();
     var dateStr = (d.getMonth()+1) + '/' + d.getDate();
-    state.entries.push({ who: who, amount: selectedAmount, date: dateStr, iso: d.toISOString() });
-    save();
+    var entry = { who: who, amount: selectedAmount, date: dateStr, iso: d.toISOString() };
     document.querySelectorAll('.amt-btn').forEach(function(b){ b.classList.remove('selected'); });
     selectedAmount = null;
+    addEntry(entry).then(render);
     render();
   });
 
   document.getElementById('filterWho').addEventListener('change', render);
 
-  load();
   document.getElementById('entryDate').value = new Date().toISOString().slice(0,10);
+  loadLocal();
   render();
+  load().then(render);
 })();
 </script>
 </body>
